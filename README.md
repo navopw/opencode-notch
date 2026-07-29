@@ -59,7 +59,7 @@ Pin a version if you would rather approve updates yourself:
 
 ```jsonc
 {
-	"plugin": ["@navopw/opencode-notch@0.1.0"]
+	"plugin": ["@navopw/opencode-notch@0.3.0"]
 }
 ```
 
@@ -104,10 +104,11 @@ bun audit
 
 `bun run build` compiles the published `dist/`. `bun run build:swift` compiles
 the notification helper and assembles `swift/notch.app`, a background
-UI-element bundle that never takes keyboard focus. It requires the Xcode
-toolchain (`swiftc`). Run `open -g -n ./swift/notch.app --args "opencode"
-"Hello" 3 42 10 "main" "12"` to preview the card without activating it (branch
-and PR args are optional).
+UI-element bundle that never takes keyboard focus. The build synchronizes its
+bundle version with `package.json`. It requires the Xcode toolchain (`swiftc`).
+Run `open -g -n ./swift/notch.app --args "opencode" "Hello" 3 42 10 "main"
+"12"` to preview the card without activating it (branch and PR args are
+optional).
 
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,
@@ -115,3 +116,7 @@ and push with tags. The Release workflow verifies the tag, builds, and
 publishes to npm.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+## License
+
+[MIT](LICENSE)

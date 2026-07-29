@@ -34,12 +34,21 @@ jobs:
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
-      - run: bun run build
-      - run: bun run build:swift
-      - name: Verify the built plugin loads
-        run: node -e "import('./dist/index.js').then(m => { if (typeof m.default !== 'function') throw new Error('default export is not a plugin function') })"
+      # prepack builds both TypeScript and Swift exactly as npm publish does.
       - name: Inspect the publishable tarball
         run: npm pack --dry-run
+      - name: Verify the built plugin loads
+        run: node -e "import('./dist/index.js').then(m => { if (typeof m.default !== 'function') throw new Error('default export is not a plugin function') })"
+      - name: Verify helper version
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          plist="swift/notch.app/Contents/Info.plist"
+          bundle="$(plutil -extract CFBundleVersion raw -o - "$plist")"
+          short="$(plutil -extract CFBundleShortVersionString raw -o - "$plist")"
+          if [ "$bundle" != "$pkg" ] || [ "$short" != "$pkg" ]; then
+            echo "Helper versions ($bundle, $short) do not match package version $pkg" >&2
+            exit 1
+          fi
 
   audit:
     name: Dependency audit

@@ -53,8 +53,6 @@ jobs:
           fi
 
       - run: bun run check
-      - run: bun run build
-      - run: bun run build:swift
 
       - name: Publish
         if: steps.registry.outputs.published == 'false'

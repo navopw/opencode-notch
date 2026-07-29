@@ -11,9 +11,10 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleVersion</key>
-	<string>2</string>
+	<string>0.3.0</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.1</string>
+	<string>0.3.0</string>
+	<!-- build:swift synchronizes both version fields from package.json. -->
 	<!-- Background UI element: the process never activates, never owns the menu bar. -->
 	<key>LSUIElement</key>
 	<true/>
