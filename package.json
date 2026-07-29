@@ -1,21 +1,59 @@
 {
-	"name": "opencode-notch",
+	"name": "@navopw/opencode-notch",
 	"version": "0.1.0",
-	"private": true,
 	"description": "Dynamic Island-style macOS notch notifications for OpenCode",
+	"keywords": [
+		"opencode",
+		"opencode-plugin",
+		"macos",
+		"notch",
+		"dynamic-island",
+		"notifications"
+	],
 	"type": "module",
 	"packageManager": "bun@1.3.14",
 	"os": [
 		"darwin"
 	],
-	"scripts": {
-		"build": "swiftc -O -swift-version 5 -parse-as-library -o swift/notch swift/notch.swift",
-		"typecheck": "tsc --noEmit"
+	"cpu": [
+		"arm64"
+	],
+	"author": "Stanislav Hetzel",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
 	},
-	"dependencies": {
-		"@opencode-ai/plugin": "^1.18.9"
+	"files": [
+		"dist",
+		"src",
+		"swift"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/navopw/opencode-notch.git"
+	},
+	"homepage": "https://github.com/navopw/opencode-notch#readme",
+	"bugs": {
+		"url": "https://github.com/navopw/opencode-notch/issues"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"check": "bun run typecheck",
+		"build": "rm -rf dist && tsc -p tsconfig.build.json",
+		"build:swift": "swiftc -O -swift-version 5 -parse-as-library -o swift/notch swift/notch.swift",
+		"prepack": "bun run build && bun run build:swift"
 	},
 	"devDependencies": {
+		"@opencode-ai/plugin": "^1.18.9",
 		"@types/bun": "^1.3.14",
 		"typescript": "^7.0.2"
 	},

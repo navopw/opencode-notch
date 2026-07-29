@@ -1,3 +1,13 @@
-node_modules
-bun.lock
+node_modules/
+dist/
+.DS_Store
+*.log
+*.tgz
+.env
+.env.*
+.npmrc
+*.key
+*.pem
+
+# Compiled notification helper, built on demand by prepack and in CI.
 swift/notch
