@@ -22,9 +22,25 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 				if (!session.data || session.data.parentID) return
 				last = now
 				const body = session.data.title || "Response ready"
-				const files = session.data.summary?.files ?? 0
-				const additions = session.data.summary?.additions ?? 0
-				const deletions = session.data.summary?.deletions ?? 0
+				// The session summary is reset to zeros and computed asynchronously
+				// after idle, so it is unreliable at notification time. Compute
+				// diff stats directly from git instead.
+				let files = 0
+				let additions = 0
+				let deletions = 0
+				try {
+					const stdout = await $`git diff --numstat HEAD`.cwd(directory).nothrow().text()
+					for (const line of stdout.trim().split("\n")) {
+						if (!line) continue
+						const cols = line.split("\t")
+						if (cols.length < 3) continue
+						const a = cols[0] === "-" ? 0 : parseInt(cols[0], 10)
+						const d = cols[1] === "-" ? 0 : parseInt(cols[1], 10)
+						if (!isNaN(a)) additions += a
+						if (!isNaN(d)) deletions += d
+						files++
+					}
+				} catch {}
 				if (existsSync(notch)) {
 					// LaunchServices honors LSUIElement; -g prevents foreground activation.
 					$`open -g -n ${notch} --args ${title} ${body} ${files} ${additions} ${deletions}`

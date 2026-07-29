@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- Changed-file, addition, and deletion counts now read from `git diff` instead
+  of the session summary, which is reset to zeros and computed asynchronously
+  after idle in opencode 1.18.9 and is therefore unavailable at notification
+  time.
+
 ### Changed
 
 - Notifications no longer play a sound.
