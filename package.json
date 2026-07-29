@@ -1,0 +1,25 @@
+{
+	"name": "opencode-notch",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Dynamic Island-style macOS notch notifications for OpenCode",
+	"type": "module",
+	"packageManager": "bun@1.3.14",
+	"os": [
+		"darwin"
+	],
+	"scripts": {
+		"build": "swiftc -O -swift-version 5 -parse-as-library -o swift/notch swift/notch.swift",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@opencode-ai/plugin": "^1.18.9"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.14",
+		"typescript": "^7.0.2"
+	},
+	"engines": {
+		"bun": ">=1.3.0"
+	}
+}
