@@ -11,6 +11,8 @@ changed files, additions, and deletions, and retracts after a few seconds. It is
 drawn by a small compiled Swift helper, not a web view, so it looks and animates
 like a native part of the menu bar.
 
+<img width="600" height="300" alt="CleanShot 2026-07-29 at 14 56 03" src="https://github.com/user-attachments/assets/c9158637-48f2-4eb8-8aad-648ec421ff87" />
+
 ## Features
 
 - Native island card that slides out of the notch with a slight spring bounce,
