@@ -171,7 +171,6 @@ enum NotchApp {
 		window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 		window.contentView = content
 
-		NSSound(named: NSSound.Name("Glass"))?.play()
 		window.orderFrontRegardless()
 		// Insurance: if the system activated us anyway, hand focus straight back.
 		if app.isActive { app.deactivate() }

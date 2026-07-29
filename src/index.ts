@@ -33,7 +33,7 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 						.catch(() => {})
 				} else {
 					// Binary not built; fall back to a standard notification.
-					const script = `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`
+					const script = `display notification "${esc(body)}" with title "${esc(title)}"`
 					await $`osascript -e ${script}`
 				}
 			} catch {

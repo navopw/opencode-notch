@@ -7,9 +7,9 @@ Dynamic Island-style macOS notch notifications for [OpenCode](https://opencode.a
 
 The plugin drops a black island card out of the MacBook notch whenever OpenCode
 finishes a response. The card shows the project and session title, summarizes
-changed files, additions, and deletions, plays the Glass sound, and retracts
-after a few seconds. It is drawn by a small compiled Swift helper, not a web
-view, so it looks and animates like a native part of the menu bar.
+changed files, additions, and deletions, and retracts after a few seconds. It is
+drawn by a small compiled Swift helper, not a web view, so it looks and animates
+like a native part of the menu bar.
 
 ## Features
 
@@ -48,9 +48,7 @@ config. The notification helper ships prebuilt in the package, so no Xcode or
 compile step is needed at install time.
 
 Verify the installation by letting OpenCode finish any response: a black island
-card should drop from the notch with the Glass sound. On the first run macOS
-may ask you to allow the terminal app to play notification sounds; the card
-itself needs no permission.
+card should drop from the notch and retract after a few seconds.
 
 Pin a version if you would rather approve updates yourself:
 
