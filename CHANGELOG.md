@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.4.0 - 2026-07-29
+
 ### Added
 
 - The package is now available under the MIT license.
