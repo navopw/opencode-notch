@@ -1,6 +1,8 @@
 // notch — Dynamic Island-style drop-down notification for macOS.
-// Build: bun run build (or: swiftc -O -swift-version 5 -parse-as-library -o swift/notch swift/notch.swift)
-// Usage: ./swift/notch "Title" "Subtitle"
+// Build: bun run build:swift (compiles the helper and assembles swift/notch.app)
+// Usage: open -g -n ./swift/notch.app --args "Title" "Subtitle"
+// The app bundle carries LSUIElement=true so the process is born a background
+// UI element: it never activates and never steals focus from the current app.
 
 import Cocoa
 
@@ -16,6 +18,13 @@ final class RoundedTile: NSView {
 		NSColor(calibratedWhite: 0.14, alpha: 1).setFill()
 		NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12).fill()
 	}
+}
+
+// A panel that never becomes key/main and never activates the app,
+// so showing the pill doesn't steal focus from the user's current app.
+final class NonActivatingPanel: NSPanel {
+	override var canBecomeKey: Bool { false }
+	override var canBecomeMain: Bool { false }
 }
 
 @main
@@ -102,7 +111,11 @@ enum NotchApp {
 		let hidden = NSRect(x: wx, y: top + 8, width: width, height: height)
 		let shown = NSRect(x: wx, y: top - height + clip, width: width, height: height)
 
-		let window = NSWindow(contentRect: hidden, styleMask: .borderless, backing: .buffered, defer: false)
+		let window = NonActivatingPanel(
+			contentRect: hidden, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
+			defer: false)
+		window.hidesOnDeactivate = false
+		window.isFloatingPanel = true
 		window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
 		window.isOpaque = false
 		window.backgroundColor = .clear
@@ -113,6 +126,8 @@ enum NotchApp {
 
 		NSSound(named: NSSound.Name("Glass"))?.play()
 		window.orderFrontRegardless()
+		// Insurance: if the system activated us anyway, hand focus straight back.
+		if app.isActive { app.deactivate() }
 
 		NSAnimationContext.runAnimationGroup({ ctx in
 			ctx.duration = 0.6

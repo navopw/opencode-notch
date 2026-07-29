@@ -98,8 +98,10 @@ bun audit
 ```
 
 `bun run build` compiles the published `dist/`. `bun run build:swift` compiles
-the notification helper to `swift/notch` and requires the Xcode toolchain
-(`swiftc`). Run `./swift/notch "opencode" "Hello"` to preview the card.
+the notification helper and assembles `swift/notch.app`, a background
+UI-element bundle that never takes keyboard focus. It requires the Xcode
+toolchain (`swiftc`). Run `open -g -n ./swift/notch.app --args "opencode"
+"Hello"` to preview the card without activating it.
 
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,

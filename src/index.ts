@@ -1,14 +1,15 @@
 import { existsSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { type Plugin } from "@opencode-ai/plugin"
 
 // Escape a string for use inside an AppleScript double-quoted literal.
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
 
-const notch = join(dirname(fileURLToPath(import.meta.url)), "..", "swift", "notch")
+const notch = join(dirname(fileURLToPath(import.meta.url)), "..", "swift", "notch.app")
 
-export const NotchPlugin: Plugin = async ({ client, $ }) => {
+export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
+	const title = basename(directory) || "opencode"
 	let last = 0
 	return {
 		event: async ({ event }) => {
@@ -22,11 +23,11 @@ export const NotchPlugin: Plugin = async ({ client, $ }) => {
 				last = now
 				const body = session.data.title || "Session complete"
 				if (existsSync(notch)) {
-					// Fire and forget; the overlay manages its own lifecycle.
-					$`${notch} "opencode" ${body}`.quiet().nothrow().catch(() => {})
+					// LaunchServices honors LSUIElement; -g prevents foreground activation.
+					$`open -g -n ${notch} --args ${title} ${body}`.quiet().nothrow().catch(() => {})
 				} else {
 					// Binary not built; fall back to a standard notification.
-					const script = `display notification "${esc(body)}" with title "opencode" sound name "Glass"`
+					const script = `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`
 					await $`osascript -e ${script}`
 				}
 			} catch {

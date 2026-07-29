@@ -10,4 +10,4 @@ dist/
 *.pem
 
 # Compiled notification helper, built on demand by prepack and in CI.
-swift/notch
+swift/notch.app/
