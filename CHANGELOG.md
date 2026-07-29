@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.5.0 - 2026-07-29
+
+### Fixed
+
+- The card is now hung off the screen's top safe area instead of the raw frame,
+  so on notched Macs its first 32pt no longer sits behind the camera housing and
+  the menu bar row. Without a notch it floats just below the menu bar.
+
 ### Changed
 
 - The card now animates like the iOS Dynamic Island. It grows out of the notch's
