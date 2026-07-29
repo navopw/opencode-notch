@@ -15,8 +15,10 @@ like a native part of the menu bar.
 
 ## Features
 
-- Native island card that slides out of the notch with a slight spring bounce,
-  rendered by a tiny Swift helper shipped prebuilt in the package
+- Native island card that grows out of the notch on a spring that overshoots and
+  settles, its corner radii opening up as it expands and its contents fading in
+  behind the shape, rendered by a tiny Swift helper shipped prebuilt in the
+  package
 - Shows the project and auto-generated session title, so you know which task
   finished
 - Shows the current branch and, when the GitHub CLI finds one, the linked pull
@@ -59,7 +61,7 @@ Pin a version if you would rather approve updates yourself:
 
 ```jsonc
 {
-	"plugin": ["@navopw/opencode-notch@0.3.0"]
+	"plugin": ["@navopw/opencode-notch@0.5.0"]
 }
 ```
 
@@ -88,9 +90,11 @@ Remove the plugin entry from your OpenCode config and restart OpenCode.
 | macOS (Intel) | Not supported, excluded via the `cpu` field |
 | Linux, Windows | Not supported, excluded via the `os` field |
 
-A notched MacBook gives the intended look: the card merges with the notch as it
-drops down. On other Apple Silicon Macs or external displays it still appears,
-sliding in from the top center of the screen.
+A notched MacBook gives the intended look: the card grows out of the notch and
+overlaps it, so the two black shapes read as one. On other Apple Silicon Macs or
+external displays it still appears, blooming from a pill-sized sliver at the top
+center and floating just below the menu bar, with the spring damped so it does
+not bounce.
 
 ## Development
 
