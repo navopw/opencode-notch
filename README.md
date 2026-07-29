@@ -7,9 +7,9 @@ Dynamic Island-style macOS notch notifications for [OpenCode](https://opencode.a
 
 The plugin drops a black island card out of the MacBook notch whenever OpenCode
 finishes a response. The card shows the project and session title, summarizes
-changed files, additions, and deletions, plays the Glass sound, and retracts
-after a few seconds. It is drawn by a small compiled Swift helper, not a web
-view, so it looks and animates like a native part of the menu bar.
+changed files, additions, and deletions, and retracts after a few seconds. It is
+drawn by a small compiled Swift helper, not a web view, so it looks and animates
+like a native part of the menu bar.
 
 ## Features
 
@@ -17,7 +17,10 @@ view, so it looks and animates like a native part of the menu bar.
   rendered by a tiny Swift helper shipped prebuilt in the package
 - Shows the project and auto-generated session title, so you know which task
   finished
-- Summarizes changed files, additions, and deletions when a response edits code
+- Shows the current branch and, when the GitHub CLI finds one, the linked pull
+  request number
+- Summarizes changed files, additions, and deletions when a response edits code;
+  branch, PR, and diff stats only appear inside a git work tree
 - Fires only when the main session goes idle: subagent sessions are skipped and
   a short debounce prevents back-to-back popups
 - Width hugs the content like the real Dynamic Island; the card never steals
@@ -48,9 +51,7 @@ config. The notification helper ships prebuilt in the package, so no Xcode or
 compile step is needed at install time.
 
 Verify the installation by letting OpenCode finish any response: a black island
-card should drop from the notch with the Glass sound. On the first run macOS
-may ask you to allow the terminal app to play notification sounds; the card
-itself needs no permission.
+card should drop from the notch and retract after a few seconds.
 
 Pin a version if you would rather approve updates yourself:
 
@@ -103,7 +104,8 @@ bun audit
 the notification helper and assembles `swift/notch.app`, a background
 UI-element bundle that never takes keyboard focus. It requires the Xcode
 toolchain (`swiftc`). Run `open -g -n ./swift/notch.app --args "opencode"
-"Hello" 3 42 10` to preview the card without activating it.
+"Hello" 3 42 10 "main" "12"` to preview the card without activating it (branch
+and PR args are optional).
 
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,

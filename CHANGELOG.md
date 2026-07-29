@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- The card now shows the current branch and, when the GitHub CLI finds one,
+  the linked pull request number. Branch, PR, and diff stats are only gathered
+  inside a git work tree.
+
+### Fixed
+
+- Changed-file, addition, and deletion counts now read from `git diff` instead
+  of the session summary, which is reset to zeros and computed asynchronously
+  after idle in opencode 1.18.9 and is therefore unavailable at notification
+  time.
+
+### Changed
+
+- Notifications no longer play a sound.
+
 ## 0.2.0 - 2026-07-29
 
 ### Added
