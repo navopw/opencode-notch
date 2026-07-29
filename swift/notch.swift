@@ -7,6 +7,12 @@
 import Cocoa
 
 final class IslandView: NSView {
+	var onDismiss: (() -> Void)?
+
+	override func hitTest(_ point: NSPoint) -> NSView? { self }
+	override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+	override func mouseDown(with event: NSEvent) { onDismiss?() }
+
 	override func draw(_ dirtyRect: NSRect) {
 		NSColor.black.withAlphaComponent(0.92).setFill()
 		// Square top corners: the card's top edge merges with the notch,
@@ -222,9 +228,23 @@ enum NotchApp {
 		window.isOpaque = false
 		window.backgroundColor = .clear
 		window.hasShadow = false
-		window.ignoresMouseEvents = true
 		window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 		window.contentView = content
+
+		var isDismissing = false
+		func dismiss() {
+			guard !isDismissing else { return }
+			isDismissing = true
+			NSAnimationContext.runAnimationGroup({ ctx in
+				ctx.duration = 0.4
+				ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+				window.animator().setFrame(hidden, display: true)
+				window.animator().alphaValue = 0
+			}) {
+				app.terminate(nil)
+			}
+		}
+		content.onDismiss = dismiss
 
 		window.orderFrontRegardless()
 		// Insurance: if the system activated us anyway, hand focus straight back.
@@ -236,14 +256,7 @@ enum NotchApp {
 			window.animator().setFrame(shown, display: true)
 		}) {
 			DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-				NSAnimationContext.runAnimationGroup({ ctx in
-					ctx.duration = 0.4
-					ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-					window.animator().setFrame(hidden, display: true)
-					window.animator().alphaValue = 0
-				}) {
-					app.terminate(nil)
-				}
+				dismiss()
 			}
 		}
 

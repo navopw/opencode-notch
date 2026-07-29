@@ -26,7 +26,7 @@ like a native part of the menu bar.
 - Fires only when the main session goes idle: subagent sessions are skipped and
   a short debounce prevents back-to-back popups
 - Width hugs the content like the real Dynamic Island; the card never steals
-  focus and dismisses itself
+  focus, dismisses itself, and can be clicked to retract it early
 - Falls back to a standard Notification Center banner when the helper binary is
   missing
 - Zero configuration
