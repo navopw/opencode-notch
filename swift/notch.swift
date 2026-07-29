@@ -8,16 +8,24 @@ import Cocoa
 
 final class IslandView: NSView {
 	var onDismiss: (() -> Void)?
+	// On a notched display the card hangs flush off the notch's bottom edge, so its
+	// top corners stay square and the two shapes read as one. Everywhere else the
+	// card floats below the menu bar and is rounded on all four corners.
+	var squareTopCorners = true
 
 	override func hitTest(_ point: NSPoint) -> NSView? { self }
 	override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 	override func mouseDown(with event: NSEvent) { onDismiss?() }
 
 	override func draw(_ dirtyRect: NSRect) {
-		NSColor.black.withAlphaComponent(0.92).setFill()
-		// Square top corners: the card's top edge merges with the notch,
-		// so only the bottom corners are rounded.
+		// Fully opaque: the notch is a physical cutout, so anything translucent
+		// reads lighter than it and breaks the illusion of one continuous shape.
+		NSColor.black.setFill()
 		let r: CGFloat = 26
+		guard squareTopCorners else {
+			NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
+			return
+		}
 		let path = NSBezierPath()
 		path.move(to: NSPoint(x: 0, y: bounds.height))
 		path.line(to: NSPoint(x: bounds.width, y: bounds.height))
@@ -67,6 +75,19 @@ enum NotchApp {
 		app.setActivationPolicy(.accessory)
 
 		guard let screen = NSScreen.main ?? NSScreen.screens.first else { exit(0) }
+
+		// Top safe area. The camera housing is a physical cutout with no pixels behind
+		// it, and the menu bar owns the strip beside it — anything drawn up there is
+		// either invisible or painted over the menu bar. On notched Macs
+		// safeAreaInsets.top is the notch height; elsewhere fall back to the menu bar
+		// height (and to the status bar thickness when the menu bar auto-hides), so the
+		// card always starts below whatever the system owns at the top of this screen.
+		let hasNotch = screen.safeAreaInsets.top > 0
+		let menuBar = screen.frame.maxY - screen.visibleFrame.maxY
+		let topInset =
+			hasNotch
+			? screen.safeAreaInsets.top
+			: (menuBar > 0 ? menuBar : NSStatusBar.system.thickness)
 
 		// --- Content ---
 		let icon = NSImage(systemSymbolName: "ellipsis.message.fill", accessibilityDescription: "Response ready")?
@@ -141,12 +162,18 @@ enum NotchApp {
 		var width = pad + tile + gap + max(titleRowWidth, subtitleFit.width, metaFit.width) + pad
 		width = max(340, min(560, width))
 		let height: CGFloat = 92
-		let clip: CGFloat = 6 // top stays hidden above the screen edge, merges with the notch
+		// How far the card's top edge crosses the safe-area boundary. Under a notch it
+		// tucks 2pt behind the housing's bottom edge so no hairline seam separates the
+		// two black shapes; without a notch it hangs 8pt clear of the menu bar as a
+		// free-floating card.
+		let overlap: CGFloat = hasNotch ? 2 : -8
+		let clip = max(overlap, 0) // part of the card hidden behind the notch
 
 		let visibleH = height - clip
 		let tileY = (visibleH - tile) / 2
 
 		let content = IslandView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+		content.squareTopCorners = hasNotch
 
 		// Summary tile
 		let tileView = RoundedTile(frame: NSRect(x: pad, y: tileY, width: tile, height: tile))
@@ -214,10 +241,12 @@ enum NotchApp {
 		}
 
 		// --- Window ---
-		let top = screen.frame.maxY
+		// Hang the card off the bottom of the safe area (notch or menu bar) instead of
+		// the raw screen edge, and drop it in from fully offscreen.
+		let safeTop = screen.frame.maxY - topInset
 		let wx = screen.frame.midX - width / 2
-		let hidden = NSRect(x: wx, y: top + 8, width: width, height: height)
-		let shown = NSRect(x: wx, y: top - height + clip, width: width, height: height)
+		let hidden = NSRect(x: wx, y: screen.frame.maxY + 8, width: width, height: height)
+		let shown = NSRect(x: wx, y: safeTop + overlap - height, width: width, height: height)
 
 		let window = NonActivatingPanel(
 			contentRect: hidden, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
