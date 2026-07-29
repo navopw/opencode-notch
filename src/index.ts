@@ -21,10 +21,16 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 				// Skip subagent (child) sessions; only notify when the main session finishes.
 				if (!session.data || session.data.parentID) return
 				last = now
-				const body = session.data.title || "Session complete"
+				const body = session.data.title || "Response ready"
+				const files = session.data.summary?.files ?? 0
+				const additions = session.data.summary?.additions ?? 0
+				const deletions = session.data.summary?.deletions ?? 0
 				if (existsSync(notch)) {
 					// LaunchServices honors LSUIElement; -g prevents foreground activation.
-					$`open -g -n ${notch} --args ${title} ${body}`.quiet().nothrow().catch(() => {})
+					$`open -g -n ${notch} --args ${title} ${body} ${files} ${additions} ${deletions}`
+						.quiet()
+						.nothrow()
+						.catch(() => {})
 				} else {
 					// Binary not built; fall back to a standard notification.
 					const script = `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`

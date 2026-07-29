@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Notch notifications now show changed-file, addition, and deletion counts.
+
+### Changed
+
+- The static checkmark tile now displays the changed-file count, or a neutral
+  response icon when no files changed.
+
 ## 0.1.1 - 2026-07-29
 
 ### Changed
