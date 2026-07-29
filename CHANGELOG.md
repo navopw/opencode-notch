@@ -9,6 +9,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - The package is now available under the MIT license.
+- Clicking an open notch card now dismisses it with the retract animation.
 
 ### Fixed
 
