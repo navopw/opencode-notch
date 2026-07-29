@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- The card now animates like the iOS Dynamic Island. It grows out of the notch's
+  own width on a spring that overshoots and settles, its corner radii open up as
+  it expands, and the contents fade and scale in just behind the shape instead of
+  riding along with it. Retracting collapses back into the notch without bounce.
+- On a notched display the card's top corners now curve inward to meet the notch
+  above them, so the two black shapes read as one.
+
 ## 0.4.0 - 2026-07-29
 
 ### Added

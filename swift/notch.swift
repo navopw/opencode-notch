@@ -5,40 +5,244 @@
 // UI element: it never activates and never steals focus from the current app.
 
 import Cocoa
+import QuartzCore
 
+// MARK: - Motion
+
+/// Unit-step response of a damped spring, matching SwiftUI's
+/// `Animation.spring(response:dampingFraction:)`: `response` is the natural
+/// period (2π/ω) and `damping` is the damping ratio ζ. Under-damped springs
+/// (ζ < 1) shoot past 1 before settling back, and that overshoot is what makes
+/// the island feel rubbery rather than merely fast.
+struct Spring {
+	let response: Double
+	let damping: Double
+
+	/// Progress from 0 towards 1, briefly exceeding it when under-damped.
+	func progress(at t: Double) -> Double {
+		guard t > 0 else { return 0 }
+		let omega = 2 * Double.pi / response
+		let zeta = min(max(damping, 0), 1)
+		let decay = exp(-zeta * omega * t)
+		guard zeta < 0.9999 else {
+			return 1 - decay * (1 + omega * t) // critically damped: no overshoot
+		}
+		let ratio = (1 - zeta * zeta).squareRoot()
+		let damped = omega * ratio
+		return 1 - decay * (cos(damped * t) + zeta / ratio * sin(damped * t))
+	}
+}
+
+/// Calls a closure once per display refresh until it reports completion.
+///
+/// The island's geometry is recomputed every frame rather than handed to Core
+/// Animation because the silhouette morphs — width, height and both corner
+/// radii move together — and a spring has to be free to overshoot its target
+/// value. Neither survives a `CABasicAnimation` on a single property.
+final class FrameDriver: NSObject {
+	private let step: (Double) -> Bool
+	private var startedAt: CFTimeInterval = 0
+	private var link: AnyObject?
+	private var timer: Timer?
+
+	init(step: @escaping (Double) -> Bool) {
+		self.step = step
+		super.init()
+	}
+
+	/// `view` only selects which display to sync to; it is not retained.
+	func start(in view: NSView) {
+		startedAt = CACurrentMediaTime()
+		if #available(macOS 14.0, *) {
+			let link = view.displayLink(target: self, selector: #selector(tick))
+			link.add(to: .main, forMode: .common)
+			self.link = link
+		} else {
+			let timer = Timer(
+				timeInterval: 1.0 / 120, target: self, selector: #selector(tick), userInfo: nil,
+				repeats: true)
+			RunLoop.main.add(timer, forMode: .common)
+			self.timer = timer
+		}
+	}
+
+	func stop() {
+		if #available(macOS 14.0, *) { (link as? CADisplayLink)?.invalidate() }
+		link = nil
+		timer?.invalidate()
+		timer = nil
+	}
+
+	@objc private func tick() {
+		if !step(CACurrentMediaTime() - startedAt) { stop() }
+	}
+}
+
+/// Ease-out cubic over a 0...1 clamped input.
+func easeOut(_ x: Double) -> Double {
+	let c = min(max(x, 0), 1)
+	return 1 - pow(1 - c, 3)
+}
+
+// MARK: - Views
+
+/// A view whose backing layer *is* the island silhouette. Filling a path in the
+/// render server (instead of `draw(_:)`) keeps a per-frame shape morph on the
+/// GPU and hands us `shadowPath` for free.
+final class ShapeView: NSView {
+	override func makeBackingLayer() -> CALayer {
+		let shape = CAShapeLayer()
+		// Fully opaque: the notch is a physical cutout, so anything translucent
+		// reads lighter than it and breaks the illusion of one continuous shape.
+		shape.fillColor = NSColor.black.cgColor
+		shape.shadowColor = NSColor.black.cgColor
+		shape.shadowOpacity = 0.35
+		shape.shadowRadius = 10
+		shape.shadowOffset = CGSize(width: 0, height: -4)
+		return shape
+	}
+
+	var shape: CAShapeLayer { layer as! CAShapeLayer }
+}
+
+/// The window's content view: an island that grows out of the notch.
+///
+/// The window itself never moves. `render(...)` is the only thing that changes
+/// the island's geometry — it rebuilds the silhouette, the mask that clips the
+/// content to it, and the content's own scale and fade in one pass, so a single
+/// spring drives the whole shape and everything stretches in lockstep.
 final class IslandView: NSView {
 	var onDismiss: (() -> Void)?
-	// On a notched display the card hangs flush off the notch's bottom edge, so its
-	// top corners stay square and the two shapes read as one. Everywhere else the
-	// card floats below the menu bar and is rounded on all four corners.
-	var squareTopCorners = true
+
+	/// Slack around the card, for the spring's overshoot and the drop shadow.
+	static let slack: CGFloat = 24
+
+	/// Settled radius of the concave top fillets. They flare *outwards* from the
+	/// card's body, so the silhouette is this much wider than the content on
+	/// either side — carving them out of the body instead would eat into the
+	/// card's own horizontal padding.
+	static let fillet: CGFloat = 13
+
+	/// Total width of the silhouette for a card of `cardWidth`.
+	static func islandWidth(cardWidth: CGFloat, notched: Bool) -> CGFloat {
+		cardWidth + (notched ? fillet * 2 : 0)
+	}
+
+	/// Concave fillets blend the card's top edge into the narrower notch above
+	/// it, so the two black shapes read as one. Without a notch the card is a
+	/// free-floating rounded rectangle instead.
+	private let notched: Bool
+	private let shapeView = ShapeView()
+	private let clipView = NSView()
+	private let contentMask = CAShapeLayer()
+	/// Where the card's own subviews live. Scaled and faded as a unit.
+	let card = NSView()
+
+	init(frame: NSRect, cardSize: NSSize, notched: Bool) {
+		self.notched = notched
+		super.init(frame: frame)
+		wantsLayer = true
+
+		shapeView.frame = bounds
+		shapeView.wantsLayer = true
+		addSubview(shapeView)
+
+		// Inset by the fillet so the card's body — and therefore its padding —
+		// keeps the width it was laid out for, with the fillets flaring outside.
+		let slack = IslandView.slack + (notched ? IslandView.fillet : 0)
+		clipView.frame = NSRect(origin: NSPoint(x: slack, y: IslandView.slack), size: cardSize)
+		clipView.wantsLayer = true
+		contentMask.frame = NSRect(origin: .zero, size: cardSize)
+		clipView.layer?.mask = contentMask
+		addSubview(clipView)
+
+		card.frame = NSRect(origin: .zero, size: cardSize)
+		card.wantsLayer = true
+		clipView.addSubview(card)
+	}
+
+	required init?(coder: NSCoder) { fatalError("not supported") }
 
 	override func hitTest(_ point: NSPoint) -> NSView? { self }
 	override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 	override func mouseDown(with event: NSEvent) { onDismiss?() }
 
-	override func draw(_ dirtyRect: NSRect) {
-		// Fully opaque: the notch is a physical cutout, so anything translucent
-		// reads lighter than it and breaks the illusion of one continuous shape.
-		NSColor.black.setFill()
-		let r: CGFloat = 26
-		guard squareTopCorners else {
-			NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
-			return
+	/// - Parameters:
+	///   - shape: 0 = collapsed to `startWidth` and no height, 1 = fully open.
+	///     May exceed 1 while the spring overshoots.
+	///   - content: 0 = hidden, 1 = settled. Deliberately lags `shape`.
+	///   - startWidth: the width the island collapses to — the notch's own.
+	///   - fade: opacity of the silhouette. Stays 1 under a real notch, where
+	///     the collapsed island is hidden behind the housing anyway.
+	func render(shape: Double, content: Double, startWidth: CGFloat, fade: Double) {
+		let cardSize = card.frame.size
+		let s = CGFloat(shape)
+		let full = IslandView.islandWidth(cardWidth: cardSize.width, notched: notched)
+		let w = startWidth + (full - startWidth) * s
+		let h = cardSize.height * s
+		let rect = CGRect(x: bounds.midX - w / 2, y: bounds.maxY - h, width: w, height: h)
+
+		// Both radii open up with the island, the way the Dynamic Island's
+		// corners relax as it expands. Clamped so the path stays well-formed
+		// while the island is still a sliver.
+		let topR = notched ? max(0, min(6 + (IslandView.fillet - 6) * s, h / 2, w / 4)) : 0
+		let bottomLimit = notched ? min(h - topR, (w - 2 * topR) / 2) : min(h / 2, w / 2)
+		let botR = max(0, min(14 + 12 * s, bottomLimit))
+		let path = IslandView.silhouette(
+			in: rect, topRadius: topR, bottomRadius: botR, notched: notched)
+
+		// The content slides up out of its own top edge as it fades in, so it
+		// looks poured into the island rather than revealed behind it.
+		let scaleY = 0.72 + 0.28 * CGFloat(content)
+		let scaleX = 0.94 + 0.06 * CGFloat(content)
+		var transform = CATransform3DMakeTranslation(0, cardSize.height / 2 * (1 - scaleY), 0)
+		transform = CATransform3DScale(transform, scaleX, scaleY, 1)
+		var toCard = CGAffineTransform(
+			translationX: -clipView.frame.minX, y: -clipView.frame.minY)
+
+		CATransaction.begin()
+		CATransaction.setDisableActions(true) // per-frame values, never re-animated
+		shapeView.shape.path = path
+		shapeView.shape.shadowPath = path
+		shapeView.shape.opacity = Float(min(max(fade, 0), 1))
+		contentMask.path = path.copy(using: &toCard)
+		card.layer?.transform = transform
+		card.layer?.opacity = Float(min(max(content * 1.4, 0), 1))
+		CATransaction.commit()
+	}
+
+	/// Dynamic Island silhouette: a full-width top edge that curves *inward* to
+	/// meet the body, so the card blends into the notch above it instead of
+	/// butting against it.
+	private static func silhouette(
+		in rect: CGRect, topRadius: CGFloat, bottomRadius: CGFloat, notched: Bool
+	) -> CGPath {
+		let path = CGMutablePath()
+		guard rect.width > 0, rect.height > 0 else { return path }
+		guard notched, topRadius > 0 else {
+			path.addRoundedRect(in: rect, cornerWidth: bottomRadius, cornerHeight: bottomRadius)
+			return path
 		}
-		let path = NSBezierPath()
-		path.move(to: NSPoint(x: 0, y: bounds.height))
-		path.line(to: NSPoint(x: bounds.width, y: bounds.height))
-		path.line(to: NSPoint(x: bounds.width, y: r))
-		path.appendArc(
-			withCenter: NSPoint(x: bounds.width - r, y: r), radius: r,
-			startAngle: 0, endAngle: 270, clockwise: true)
-		path.line(to: NSPoint(x: r, y: 0))
-		path.appendArc(
-			withCenter: NSPoint(x: r, y: r), radius: r,
-			startAngle: 270, endAngle: 180, clockwise: true)
-		path.close()
-		path.fill()
+		let left = rect.minX + topRadius
+		let right = rect.maxX - topRadius
+		path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+		path.addQuadCurve(
+			to: CGPoint(x: left, y: rect.maxY - topRadius),
+			control: CGPoint(x: left, y: rect.maxY))
+		path.addLine(to: CGPoint(x: left, y: rect.minY + bottomRadius))
+		path.addQuadCurve(
+			to: CGPoint(x: left + bottomRadius, y: rect.minY),
+			control: CGPoint(x: left, y: rect.minY))
+		path.addLine(to: CGPoint(x: right - bottomRadius, y: rect.minY))
+		path.addQuadCurve(
+			to: CGPoint(x: right, y: rect.minY + bottomRadius),
+			control: CGPoint(x: right, y: rect.minY))
+		path.addLine(to: CGPoint(x: right, y: rect.maxY - topRadius))
+		path.addQuadCurve(
+			to: CGPoint(x: rect.maxX, y: rect.maxY),
+			control: CGPoint(x: right, y: rect.maxY))
+		path.closeSubpath()
+		return path
 	}
 }
 
@@ -88,6 +292,17 @@ enum NotchApp {
 			hasNotch
 			? screen.safeAreaInsets.top
 			: (menuBar > 0 ? menuBar : NSStatusBar.system.thickness)
+
+		// The width the island grows out of and collapses back into. The areas
+		// flanking the notch give its exact width; without a notch, pick a
+		// pill-sized sliver so the card still blooms from the menu bar.
+		let notchWidth: CGFloat = {
+			guard hasNotch,
+				let left = screen.auxiliaryTopLeftArea,
+				let right = screen.auxiliaryTopRightArea
+			else { return hasNotch ? 190 : 200 }
+			return screen.frame.width - left.width - right.width
+		}()
 
 		// --- Content ---
 		let icon = NSImage(systemSymbolName: "ellipsis.message.fill", accessibilityDescription: "Response ready")?
@@ -172,8 +387,29 @@ enum NotchApp {
 		let visibleH = height - clip
 		let tileY = (visibleH - tile) / 2
 
-		let content = IslandView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-		content.squareTopCorners = hasNotch
+		// --- Window ---
+		// The window is fixed: it sits where the fully open card belongs, padded
+		// with slack for the spring's overshoot and the shadow. Only the island
+		// inside it animates, which keeps the whole morph on the render server —
+		// animating the window frame instead would drive it from the main thread
+		// and could never overshoot past the notch.
+		//
+		// The silhouette is wider than the card it wraps, because the top fillets
+		// flare outwards from the body rather than being carved out of it.
+		let slack = IslandView.slack
+		let safeTop = screen.frame.maxY - topInset
+		let islandWidth = IslandView.islandWidth(cardWidth: width, notched: hasNotch)
+		let islandOrigin = NSPoint(
+			x: screen.frame.midX - islandWidth / 2, y: safeTop + overlap - height)
+		let windowRect = NSRect(
+			x: islandOrigin.x - slack, y: islandOrigin.y - slack,
+			width: islandWidth + slack * 2, height: height + slack)
+
+		let island = IslandView(
+			frame: NSRect(origin: .zero, size: windowRect.size),
+			cardSize: NSSize(width: width, height: height),
+			notched: hasNotch)
+		let content = island.card
 
 		// Summary tile
 		let tileView = RoundedTile(frame: NSRect(x: pad, y: tileY, width: tile, height: tile))
@@ -240,16 +476,8 @@ enum NotchApp {
 			content.addSubview(deletionsLabel)
 		}
 
-		// --- Window ---
-		// Hang the card off the bottom of the safe area (notch or menu bar) instead of
-		// the raw screen edge, and drop it in from fully offscreen.
-		let safeTop = screen.frame.maxY - topInset
-		let wx = screen.frame.midX - width / 2
-		let hidden = NSRect(x: wx, y: screen.frame.maxY + 8, width: width, height: height)
-		let shown = NSRect(x: wx, y: safeTop + overlap - height, width: width, height: height)
-
 		let window = NonActivatingPanel(
-			contentRect: hidden, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
+			contentRect: windowRect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
 			defer: false)
 		window.hidesOnDeactivate = false
 		window.isFloatingPanel = true
@@ -258,37 +486,72 @@ enum NotchApp {
 		window.backgroundColor = .clear
 		window.hasShadow = false
 		window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-		window.contentView = content
+		window.contentView = island
 
-		var isDismissing = false
-		func dismiss() {
-			guard !isDismissing else { return }
-			isDismissing = true
-			NSAnimationContext.runAnimationGroup({ ctx in
-				ctx.duration = 0.4
-				ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-				window.animator().setFrame(hidden, display: true)
-				window.animator().alphaValue = 0
-			}) {
-				app.terminate(nil)
+		// --- Animation ---
+		// Opening springs; closing does not. An under-damped open makes the card
+		// stretch past its size and snap back, which is the whole character of
+		// the Dynamic Island. Bouncing on the way out just looks indecisive, so
+		// the close is critically damped — the same split DynamicNotchKit and
+		// boring.notch both settled on.
+		let startWidth = min(notchWidth, islandWidth)
+		let open = Spring(response: 0.42, damping: hasNotch ? 0.74 : 0.9)
+		let openDuration = 0.7
+		let close = Spring(response: 0.34, damping: 1)
+		let closeDuration = 0.42
+		let dwell = 2.8
+
+		// Holds the collapse driver for its lifetime, and doubles as the guard
+		// against dismissing twice (a click landing during the auto-dismiss).
+		var closing: FrameDriver?
+
+		let opening = FrameDriver { t in
+			guard t < openDuration else {
+				island.render(shape: 1, content: 1, startWidth: startWidth, fade: 1)
+				return false
 			}
+			island.render(
+				shape: open.progress(at: t),
+				// The content trails the shape: the island opens first, then the
+				// content settles into the room it made.
+				content: easeOut((t - 0.09) / 0.30),
+				startWidth: startWidth,
+				fade: hasNotch ? 1 : easeOut(t / 0.12))
+			return true
 		}
-		content.onDismiss = dismiss
 
+		func dismiss() {
+			guard closing == nil else { return }
+			opening.stop()
+			let driver = FrameDriver { t in
+				guard t < closeDuration else {
+					island.render(shape: 0, content: 0, startWidth: startWidth, fade: 0)
+					app.terminate(nil)
+					return false
+				}
+				island.render(
+					shape: 1 - close.progress(at: t),
+					// Content clears out ahead of the shape, so the island never
+					// closes over legible text.
+					content: 1 - easeOut(t / 0.15),
+					startWidth: startWidth,
+					fade: hasNotch ? 1 : 1 - easeOut(t / 0.22))
+				return true
+			}
+			closing = driver
+			driver.start(in: island)
+		}
+		island.onDismiss = dismiss
+
+		// Seed the collapsed state before the window is visible, so the card is
+		// never shown at full size for a frame.
+		island.render(shape: 0, content: 0, startWidth: startWidth, fade: 0)
 		window.orderFrontRegardless()
 		// Insurance: if the system activated us anyway, hand focus straight back.
 		if app.isActive { app.deactivate() }
 
-		NSAnimationContext.runAnimationGroup({ ctx in
-			ctx.duration = 0.6
-			ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.3, 1.35, 0.5, 1) // slight overshoot
-			window.animator().setFrame(shown, display: true)
-		}) {
-			DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
-				dismiss()
-			}
-		}
-
+		opening.start(in: island)
+		DispatchQueue.main.asyncAfter(deadline: .now() + openDuration + dwell) { dismiss() }
 		DispatchQueue.main.asyncAfter(deadline: .now() + 6) { app.terminate(nil) } // safety net
 
 		app.run()
