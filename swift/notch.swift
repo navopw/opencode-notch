@@ -9,7 +9,22 @@ import Cocoa
 final class IslandView: NSView {
 	override func draw(_ dirtyRect: NSRect) {
 		NSColor.black.withAlphaComponent(0.92).setFill()
-		NSBezierPath(roundedRect: bounds, xRadius: 26, yRadius: 26).fill()
+		// Square top corners: the card's top edge merges with the notch,
+		// so only the bottom corners are rounded.
+		let r: CGFloat = 26
+		let path = NSBezierPath()
+		path.move(to: NSPoint(x: 0, y: bounds.height))
+		path.line(to: NSPoint(x: bounds.width, y: bounds.height))
+		path.line(to: NSPoint(x: bounds.width, y: r))
+		path.appendArc(
+			withCenter: NSPoint(x: bounds.width - r, y: r), radius: r,
+			startAngle: 0, endAngle: 270, clockwise: true)
+		path.line(to: NSPoint(x: r, y: 0))
+		path.appendArc(
+			withCenter: NSPoint(x: r, y: r), radius: r,
+			startAngle: 270, endAngle: 180, clockwise: true)
+		path.close()
+		path.fill()
 	}
 }
 
