@@ -1,6 +1,6 @@
 {
 	"name": "@navopw/opencode-notch",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Dynamic Island-style macOS notch notifications for OpenCode",
 	"keywords": [
 		"opencode",
