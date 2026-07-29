@@ -6,6 +6,41 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Permission prompts now drop a card with Allow / Always / Deny buttons, wired
+  to the same reply endpoint the TUI uses. Cards for permissions answered in
+  the TUI retract on their own, and an unanswered card times out after two
+  minutes without inventing a response. Subagent permissions are included, with
+  the session title on the card's meta line.
+- Multiple notifications now stack inside one island, separated by hairlines,
+  with permission cards pinned above idle ones. The stack is capped at four
+  cards; overflow drops the oldest idle card, never a pending permission.
+- Notifications from every running OpenCode instance share one island: the
+  plugin talks to a single helper daemon over a Unix socket
+  (`$TMPDIR/opencode-notch-<version>.sock`), spawned on demand and exiting
+  about ten seconds after the last instance disconnects.
+- Hovering the island holds its cards open; the dwell countdown resumes with a
+  short grace once the pointer leaves. A small × appears on hover to dismiss a
+  card by hand.
+- The helper gained `--serve` (newline-delimited JSON on stdio) and
+  `--serve --socket PATH` (multi-client daemon) modes; the one-shot
+  positional-argv mode still works and remains the fallback.
+
+### Changed
+
+- Clicking a card no longer dismisses it — buttons and the hover × are the
+  interactive surfaces, and clicks outside the island's exact silhouette pass
+  through to the app underneath.
+- Idle cards appear immediately from session data; branch, PR, and diff stats
+  pour into the visible card a beat later instead of delaying it behind four
+  subprocesses and a network call.
+- The global 4.5 s debounce is gone; a repeat idle for the same session updates
+  its existing card in place instead of being dropped.
+- A resident helper now recomputes its geometry when displays change, so cards
+  follow dock/undock and resolution switches, including the notched/notchless
+  silhouette flip.
+
 ## 0.5.0 - 2026-07-29
 
 ### Fixed
