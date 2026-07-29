@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- The package is now available under the MIT license.
+
+### Fixed
+
+- The native helper now reports the package version in its bundle metadata.
+
+### Changed
+
+- CI and releases now use the package lifecycle build without compiling the
+  plugin and native helper twice.
+
 ## 0.3.0 - 2026-07-29
 
 ### Added
