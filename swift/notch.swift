@@ -1,6 +1,6 @@
 // notch — Dynamic Island-style drop-down notification for macOS.
 // Build: bun run build:swift (compiles the helper and assembles swift/notch.app)
-// Usage: open -g -n ./swift/notch.app --args "Project" "Session" 3 42 10
+// Usage: open -g -n ./swift/notch.app --args "Project" "Session" 3 42 10 "branch" "42"
 // The app bundle carries LSUIElement=true so the process is born a background
 // UI element: it never activates and never steals focus from the current app.
 
@@ -38,6 +38,9 @@ enum NotchApp {
 		let additions = max(0, args.count > 4 ? Int(args[4]) ?? 0 : 0)
 		let deletions = max(0, args.count > 5 ? Int(args[5]) ?? 0 : 0)
 		let hasChanges = files > 0 || additions > 0 || deletions > 0
+		let branch = args.count > 6 ? args[6] : ""
+		let pr = args.count > 7 ? args[7] : ""
+		let hasMeta = !branch.isEmpty
 
 		let app = NSApplication.shared
 		app.setActivationPolicy(.accessory)
@@ -71,11 +74,38 @@ enum NotchApp {
 		deletionsLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
 		deletionsLabel.textColor = .systemRed
 
+		// Meta line: branch symbol + branch name, plus the linked PR if any.
+		let meta = NSMutableAttributedString()
+		if hasMeta {
+			if let sym = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: "branch")?
+				.withSymbolConfiguration(
+					NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+						.applying(NSImage.SymbolConfiguration(paletteColors: [NSColor(calibratedWhite: 0.62, alpha: 1)]))
+				)
+			{
+				let attach = NSTextAttachment()
+				attach.image = sym
+				meta.append(NSAttributedString(attachment: attach))
+			}
+			let style: [NSAttributedString.Key: Any] = [
+				.font: NSFont.systemFont(ofSize: 11, weight: .medium),
+				.foregroundColor: NSColor(calibratedWhite: 0.62, alpha: 1),
+			]
+			meta.append(NSAttributedString(string: " \(branch)", attributes: style))
+			if !pr.isEmpty {
+				meta.append(NSAttributedString(string: "  ·  PR #\(pr)", attributes: style))
+			}
+		}
+		let metaLabel = NSTextField(labelWithAttributedString: meta)
+		metaLabel.lineBreakMode = .byTruncatingTail
+		metaLabel.maximumNumberOfLines = 1
+
 		let huge = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 		let titleFit = titleLabel.sizeThatFits(huge)
 		let subtitleFit = subtitle.isEmpty ? NSSize.zero : subtitleLabel.sizeThatFits(huge)
 		let additionsFit = hasChanges ? additionsLabel.sizeThatFits(huge) : NSSize.zero
 		let deletionsFit = hasChanges ? deletionsLabel.sizeThatFits(huge) : NSSize.zero
+		let metaFit = hasMeta ? metaLabel.sizeThatFits(huge) : NSSize.zero
 
 		let pad: CGFloat = 20
 		let tile: CGFloat = 48 // "album art" square
@@ -87,7 +117,7 @@ enum NotchApp {
 		let titleRowWidth = titleFit.width + (hasChanges ? titleStatGap + statsWidth : 0)
 
 		// Width hugs the content like the Dynamic Island, clamped.
-		var width = pad + tile + gap + max(titleRowWidth, subtitleFit.width) + pad
+		var width = pad + tile + gap + max(titleRowWidth, subtitleFit.width, metaFit.width) + pad
 		width = max(340, min(560, width))
 		let height: CGFloat = 92
 		let clip: CGFloat = 6 // top stays hidden above the screen edge, merges with the notch
@@ -122,17 +152,27 @@ enum NotchApp {
 		}
 		content.addSubview(tileView)
 
-		// Two-line text stack
+		// Text stack: meta (branch/PR) at the bottom, subtitle, title on top.
 		let textX = pad + tile + gap
 		let textW = width - textX - pad
-		let textH = titleFit.height + textGap + subtitleFit.height
+		let textH =
+			titleFit.height
+			+ (subtitle.isEmpty ? 0 : textGap + subtitleFit.height)
+			+ (hasMeta ? textGap + metaFit.height : 0)
 		let textY = tileY + (tile - textH) / 2
-		let titleY = textY + (subtitle.isEmpty ? 0 : subtitleFit.height + textGap)
 
-		if !subtitle.isEmpty {
-			subtitleLabel.frame = NSRect(x: textX, y: textY, width: textW, height: subtitleFit.height)
-			content.addSubview(subtitleLabel)
+		var stackY = textY
+		if hasMeta {
+			metaLabel.frame = NSRect(x: textX, y: stackY, width: textW, height: metaFit.height)
+			content.addSubview(metaLabel)
+			stackY += metaFit.height + textGap
 		}
+		if !subtitle.isEmpty {
+			subtitleLabel.frame = NSRect(x: textX, y: stackY, width: textW, height: subtitleFit.height)
+			content.addSubview(subtitleLabel)
+			stackY += subtitleFit.height + textGap
+		}
+		let titleY = stackY
 		let titleWidth = textW - (hasChanges ? titleStatGap + statsWidth : 0)
 		titleLabel.frame = NSRect(x: textX, y: titleY, width: titleWidth, height: titleFit.height)
 		content.addSubview(titleLabel)

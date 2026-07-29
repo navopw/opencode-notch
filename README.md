@@ -17,7 +17,10 @@ like a native part of the menu bar.
   rendered by a tiny Swift helper shipped prebuilt in the package
 - Shows the project and auto-generated session title, so you know which task
   finished
-- Summarizes changed files, additions, and deletions when a response edits code
+- Shows the current branch and, when the GitHub CLI finds one, the linked pull
+  request number
+- Summarizes changed files, additions, and deletions when a response edits code;
+  branch, PR, and diff stats only appear inside a git work tree
 - Fires only when the main session goes idle: subagent sessions are skipped and
   a short debounce prevents back-to-back popups
 - Width hugs the content like the real Dynamic Island; the card never steals
@@ -101,7 +104,8 @@ bun audit
 the notification helper and assembles `swift/notch.app`, a background
 UI-element bundle that never takes keyboard focus. It requires the Xcode
 toolchain (`swiftc`). Run `open -g -n ./swift/notch.app --args "opencode"
-"Hello" 3 42 10` to preview the card without activating it.
+"Hello" 3 42 10 "main" "12"` to preview the card without activating it (branch
+and PR args are optional).
 
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,
