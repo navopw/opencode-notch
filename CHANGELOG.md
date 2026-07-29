@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.1.1 - 2026-07-29
+
+### Changed
+
+- Notifications now show the project directory name instead of `opencode`.
+
+### Fixed
+
+- The notch card now launches as a background UI element and no longer briefly
+  steals keyboard focus from the current application.
+
 ## 0.1.0 - 2026-07-29
 
 ### Added
