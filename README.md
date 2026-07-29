@@ -6,16 +6,18 @@
 Dynamic Island-style macOS notch notifications for [OpenCode](https://opencode.ai/).
 
 The plugin drops a black island card out of the MacBook notch whenever OpenCode
-finishes a response. The card shows the session title next to a checkmark tile,
-plays the Glass sound, and retracts after a few seconds. It is drawn by a small
-compiled Swift helper, not a web view, so it looks and animates like a native
-part of the menu bar.
+finishes a response. The card shows the project and session title, summarizes
+changed files, additions, and deletions, plays the Glass sound, and retracts
+after a few seconds. It is drawn by a small compiled Swift helper, not a web
+view, so it looks and animates like a native part of the menu bar.
 
 ## Features
 
 - Native island card that slides out of the notch with a slight spring bounce,
   rendered by a tiny Swift helper shipped prebuilt in the package
-- Shows the auto-generated session title, so you know which task finished
+- Shows the project and auto-generated session title, so you know which task
+  finished
+- Summarizes changed files, additions, and deletions when a response edits code
 - Fires only when the main session goes idle: subagent sessions are skipped and
   a short debounce prevents back-to-back popups
 - Width hugs the content like the real Dynamic Island; the card never steals
@@ -101,7 +103,7 @@ bun audit
 the notification helper and assembles `swift/notch.app`, a background
 UI-element bundle that never takes keyboard focus. It requires the Xcode
 toolchain (`swiftc`). Run `open -g -n ./swift/notch.app --args "opencode"
-"Hello"` to preview the card without activating it.
+"Hello" 3 42 10` to preview the card without activating it.
 
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,
