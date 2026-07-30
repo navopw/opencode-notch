@@ -102,9 +102,9 @@ Remove the plugin entry from your OpenCode config and restart OpenCode.
 
 A notched MacBook gives the intended look: the card grows out of the notch and
 overlaps it, so the two black shapes read as one. On other Apple Silicon Macs or
-external displays it still appears, blooming from a pill-sized sliver at the top
-center and floating just below the menu bar, with the spring damped so it does
-not bounce.
+external displays it still appears, blooming from a pill-sized sliver at the
+very top of the screen — a virtual notch over the empty center of the menu
+bar — with the spring damped so it does not bounce.
 
 ## Development
 
