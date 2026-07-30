@@ -27,6 +27,12 @@ All notable changes to this project are documented here. The format follows
   `--serve --socket PATH` (multi-client daemon) modes; the one-shot
   positional-argv mode still works and remains the fallback.
 
+### Fixed
+
+- On notchless displays (external monitors, docked mode) the island now anchors
+  flush to the screen's top edge, blooming over the empty center of the menu
+  bar like a virtual notch, instead of floating ~32pt down below the menu bar.
+
 ### Changed
 
 - Clicking a card no longer dismisses it — buttons and the hover × are the

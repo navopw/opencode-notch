@@ -1219,23 +1219,18 @@ final class NotchController {
 	private struct ScreenMetrics {
 		let hasNotch: Bool
 		let startWidth: CGFloat
-		let overlap: CGFloat
 		let windowRect: NSRect
 	}
 
 	private static func metrics(for screen: NSScreen) -> ScreenMetrics {
-		// Top safe area. The camera housing is a physical cutout with no pixels
-		// behind it, and the menu bar owns the strip beside it — anything drawn up
-		// there is either invisible or painted over the menu bar. On notched Macs
-		// safeAreaInsets.top is the notch height; elsewhere fall back to the menu
-		// bar height (and to the status bar thickness when the menu bar
-		// auto-hides), so cards always start below whatever the system owns.
+		// Top anchor. The camera housing is a physical cutout with no pixels
+		// behind it, so on notched Macs the island starts below it —
+		// safeAreaInsets.top is the notch height. Notchless displays (external
+		// monitors, docked mode) have no cutout to clear: the island anchors
+		// flush to the screen's top edge and blooms over the empty center of
+		// the menu bar, a virtual notch rather than a card hanging below it.
 		let hasNotch = screen.safeAreaInsets.top > 0
-		let menuBar = screen.frame.maxY - screen.visibleFrame.maxY
-		let topInset =
-			hasNotch
-			? screen.safeAreaInsets.top
-			: (menuBar > 0 ? menuBar : NSStatusBar.system.thickness)
+		let topInset = hasNotch ? screen.safeAreaInsets.top : 0
 
 		// The width the island grows out of and collapses back into. The areas
 		// flanking the notch give its exact width; without a notch, pick a
@@ -1250,9 +1245,9 @@ final class NotchController {
 
 		// How far the island's top edge crosses the safe-area boundary. Under a
 		// notch it tucks 2pt behind the housing's bottom edge so no hairline seam
-		// separates the two black shapes; without a notch it hangs 8pt clear of
-		// the menu bar as a free-floating card.
-		let overlap: CGFloat = hasNotch ? 2 : -8
+		// separates the two black shapes; without a notch it sits exactly on the
+		// screen's top edge.
+		let overlap: CGFloat = hasNotch ? 2 : 0
 
 		// The window is a fixed tall band sized for the largest possible stack:
 		// it never moves or resizes while animating, which keeps the whole morph
@@ -1269,7 +1264,7 @@ final class NotchController {
 			width: bandWidth, height: bandHeight)
 		let startWidth = min(notchWidth, maxIslandWidth)
 		return ScreenMetrics(
-			hasNotch: hasNotch, startWidth: startWidth, overlap: overlap, windowRect: rect)
+			hasNotch: hasNotch, startWidth: startWidth, windowRect: rect)
 	}
 
 	// MARK: Heartbeat: pointer poll + dwell/timeout clock
