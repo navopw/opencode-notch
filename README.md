@@ -19,16 +19,26 @@ like a native part of the menu bar.
   settles, its corner radii opening up as it expands and its contents fading in
   behind the shape, rendered by a tiny Swift helper shipped prebuilt in the
   package
+- Multiple notifications stack inside one island — even across several OpenCode
+  instances, which all share a single background helper — with permission cards
+  pinned above idle ones
+- Allow / Always / Deny buttons for OpenCode permission prompts, answered
+  through the same endpoint the TUI uses; unanswered cards time out without
+  inventing a response
 - Shows the project and auto-generated session title, so you know which task
   finished
 - Shows the current branch and, when the GitHub CLI finds one, the linked pull
-  request number
+  request number; the card appears instantly and the git stats pour in a beat
+  later
 - Summarizes changed files, additions, and deletions when a response edits code;
   branch, PR, and diff stats only appear inside a git work tree
-- Fires only when the main session goes idle: subagent sessions are skipped and
-  a short debounce prevents back-to-back popups
-- Width hugs the content like the real Dynamic Island; the card never steals
-  focus, dismisses itself, and can be clicked to retract it early
+- Idle notifications fire only when the main session goes idle: subagent
+  sessions are skipped, and repeat notifications for the same session update
+  the existing card in place
+- Hovering a card holds it open; a small × appears on hover to dismiss it, and
+  clicks anywhere else pass straight through to the app underneath
+- Width hugs the content like the real Dynamic Island; the island never steals
+  focus
 - Falls back to a standard Notification Center banner when the helper binary is
   missing
 - Zero configuration
@@ -92,9 +102,9 @@ Remove the plugin entry from your OpenCode config and restart OpenCode.
 
 A notched MacBook gives the intended look: the card grows out of the notch and
 overlaps it, so the two black shapes read as one. On other Apple Silicon Macs or
-external displays it still appears, blooming from a pill-sized sliver at the top
-center and floating just below the menu bar, with the spring damped so it does
-not bounce.
+external displays it still appears, blooming from a pill-sized sliver at the
+very top of the screen — a virtual notch over the empty center of the menu
+bar — with the spring damped so it does not bounce.
 
 ## Development
 
@@ -111,8 +121,20 @@ the notification helper and assembles `swift/notch.app`, a background
 UI-element bundle that never takes keyboard focus. The build synchronizes its
 bundle version with `package.json`. It requires the Xcode toolchain (`swiftc`).
 Run `open -g -n ./swift/notch.app --args "opencode" "Hello" 3 42 10 "main"
-"12"` to preview the card without activating it (branch and PR args are
+"12"` to preview a single card without activating it (branch and PR args are
 optional).
+
+At runtime the plugin talks to one shared helper daemon over a Unix socket at
+`$TMPDIR/opencode-notch-<version>.sock`, spawning it on demand; the daemon
+exits about ten seconds after the last OpenCode instance disconnects. To poke
+at the newline-delimited JSON protocol by hand, run the binary in stdio mode:
+
+```sh
+./swift/notch.app/Contents/MacOS/notch --serve
+{"cmd":"show","id":"x","kind":"idle","dwell":3,"title":"hello","subtitle":"world"}
+```
+
+The full protocol is documented in the header of `swift/notch.swift`.
 
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,
