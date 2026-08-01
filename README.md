@@ -25,6 +25,8 @@ like a native part of the menu bar.
 - Allow / Always / Deny buttons for OpenCode permission prompts, answered
   through the same endpoint the TUI uses; unanswered cards time out without
   inventing a response
+- Drops a red-flagged error card when a session fails, showing why, so a failed
+  response is never silent; responses you abort yourself stay quiet
 - Shows the project and auto-generated session title, so you know which task
   finished
 - Shows the current branch and, when the GitHub CLI finds one, the linked pull

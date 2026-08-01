@@ -16,6 +16,9 @@
 //         "actions":[{"id":"once","label":"Allow","style":"primary"},
 //                    {"id":"always","label":"Always"},
 //                    {"id":"reject","label":"Deny","style":"danger"}]}
+//        {"cmd":"show","id":"error:ses_x","kind":"error","dwell":5,"timeout":60,
+//         "title":"project","subtitle":"Provider rejected the request",
+//         "meta":"Session title"}
 //        {"cmd":"update", ...}   like show, but a no-op if the id is gone
 //        {"cmd":"dismiss","id":"perm:per_x"}
 //        {"cmd":"clear"}
@@ -194,6 +197,8 @@ struct NotchItem {
 	var actions: [WireAction]
 
 	var isPermission: Bool { kind == "permission" }
+	// Errors carry no buttons and stack like idle cards; only the glyph differs.
+	var isError: Bool { kind == "error" }
 
 	init(command: WireCommand) {
 		id = command.id ?? ""
@@ -534,8 +539,18 @@ final class CardView: NSView {
 			fileLabel.frame = NSRect(x: 2, y: 8, width: tileSize - 4, height: 10)
 			tileView.addSubview(fileLabel)
 		} else {
-			let symbol = item.isPermission ? "hand.raised.fill" : "ellipsis.message.fill"
-			let color: NSColor = item.isPermission ? .systemOrange : .systemBlue
+			let symbol: String
+			let color: NSColor
+			if item.isPermission {
+				symbol = "hand.raised.fill"
+				color = .systemOrange
+			} else if item.isError {
+				symbol = "exclamationmark.triangle.fill"
+				color = .systemRed
+			} else {
+				symbol = "ellipsis.message.fill"
+				color = .systemBlue
+			}
 			if let icon = NSImage(systemSymbolName: symbol, accessibilityDescription: item.kind)?
 				.withSymbolConfiguration(
 					NSImage.SymbolConfiguration(pointSize: 19, weight: .bold)
