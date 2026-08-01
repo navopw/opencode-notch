@@ -158,6 +158,11 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 	// (a fresh daemon starts with an empty island).
 	const pending = new Map<string, { sessionID: string; show: ShowPayload }>()
 
+	// Sessions whose idle card is (as far as we know) still on screen. Consulted
+	// before dismissing: a send on a session that never got a card would connect
+	// — and therefore spawn a daemon — for nothing.
+	const idle = new Set<string>()
+
 	const helper = new Helper(
 		$,
 		(event) => {
@@ -169,6 +174,12 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 	)
 
 	async function handleHelperEvent(event: HelperEvent) {
+		if (event.id?.startsWith("idle:")) {
+			// The helper retracted the card on its own (timeout, hand dismissal, or
+			// replaced by a newer one), so stop counting it as live.
+			if (event.event === "dismissed") idle.delete(event.id.slice(5))
+			return
+		}
 		if (!event.id?.startsWith("perm:")) return
 		const permissionID = event.id.slice(5)
 		if (event.event === "action") {
@@ -276,6 +287,7 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 			await fallbackNotify(project, body)
 			return
 		}
+		idle.add(sessionID)
 		try {
 			const git = await gatherGit()
 			// `update` (not `show`): if the card already dwell-expired while gh was
@@ -337,6 +349,15 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 					case "session.idle":
 						await onSessionIdle(event.properties.sessionID)
 						break
+					case "session.status": {
+						// Working again: the "response ready" card is answering a question
+						// the user already moved past, so retract it.
+						if (event.properties.status.type !== "busy") break
+						const { sessionID } = event.properties
+						if (idle.delete(sessionID))
+							void helper.send({ cmd: "dismiss", id: `idle:${sessionID}` })
+						break
+					}
 					case "permission.updated":
 						await onPermissionUpdated(event.properties)
 						break
@@ -350,6 +371,7 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 					}
 					case "session.deleted": {
 						const sessionID = event.properties.info.id
+						idle.delete(sessionID)
 						void helper.send({ cmd: "dismiss", id: `idle:${sessionID}` })
 						for (const [permissionID, entry] of pending) {
 							if (entry.sessionID !== sessionID) continue

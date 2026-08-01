@@ -33,8 +33,9 @@ like a native part of the menu bar.
 - Summarizes changed files, additions, and deletions when a response edits code;
   branch, PR, and diff stats only appear inside a git work tree
 - Idle notifications fire only when the main session goes idle: subagent
-  sessions are skipped, and repeat notifications for the same session update
-  the existing card in place
+  sessions are skipped, repeat notifications for the same session update the
+  existing card in place, and a card retracts as soon as its session starts
+  working again
 - Hovering a card holds it open; a small × appears on hover to dismiss it, and
   clicks anywhere else pass straight through to the app underneath
 - Width hugs the content like the real Dynamic Island; the island never steals
