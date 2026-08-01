@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- An idle card now retracts as soon as its session starts working again, so a
+  follow-up prompt clears the stale "response ready" card instead of leaving it
+  on screen (or held open by the pointer).
+
 ## 0.6.0 - 2026-07-30
 
 ### Added
