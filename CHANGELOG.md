@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- A failing session now drops an error card with a warning glyph and the
+  provider's message, held a little longer than an idle card. Aborting a
+  response yourself is not treated as a failure and shows nothing.
+
 ## 0.6.0 - 2026-07-30
 
 ### Added

@@ -284,6 +284,40 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 		} catch {}
 	}
 
+	async function onSessionError(properties: {
+		sessionID?: string
+		error?: { name: string; data?: { [key: string]: unknown } }
+	}) {
+		const error = properties.error
+		// No payload says nothing worth showing; an aborted message is the user
+		// stopping a response by hand, which is not a failure.
+		if (!error || error.name === "MessageAbortedError") return
+		// Every error shape but MessageOutputLengthError carries a human message.
+		const message = typeof error.data?.message === "string" ? error.data.message : error.name
+		// Sessionless errors share one id: a stream of them replaces the card in
+		// place rather than burying the island.
+		const sessionID = properties.sessionID
+		let meta = ""
+		if (sessionID) {
+			try {
+				const session = await client.session.get({ path: { id: sessionID } })
+				meta = session.data?.title ?? ""
+			} catch {}
+		}
+		const show: ShowPayload = {
+			cmd: "show",
+			id: `error:${sessionID ?? "unknown"}`,
+			kind: "error",
+			// Longer than idle's dwell: a failure is worth reading before it goes.
+			dwell: 5,
+			timeout: 60,
+			title: project,
+			subtitle: message,
+			meta,
+		}
+		if (!(await helper.send(show))) await fallbackNotify(project, message)
+	}
+
 	async function onPermissionUpdated(permission: {
 		id: string
 		type: string
@@ -336,6 +370,9 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 				switch (event.type) {
 					case "session.idle":
 						await onSessionIdle(event.properties.sessionID)
+						break
+					case "session.error":
+						await onSessionError(event.properties)
 						break
 					case "permission.updated":
 						await onPermissionUpdated(event.properties)
