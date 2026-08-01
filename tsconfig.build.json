@@ -10,5 +10,6 @@
 		// Emitted JavaScript must not keep the `.ts` specifiers the source uses.
 		"rewriteRelativeImportExtensions": true
 	},
-	"include": ["src/**/*.ts"]
+	"include": ["src/**/*.ts"],
+	"exclude": ["src/**/*.test.ts"]
 }

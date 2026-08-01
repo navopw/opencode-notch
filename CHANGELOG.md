@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- A `bun test` suite covering the plugin's daemon protocol against a fake
+  socket daemon: idle and permission cards, button-press replies, dismissals,
+  and the re-show of pending permissions after a reconnect. `bun run check`
+  now runs it alongside the typecheck.
+
 ## 0.6.0 - 2026-07-30
 
 ### Added

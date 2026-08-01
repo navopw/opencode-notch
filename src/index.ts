@@ -22,7 +22,9 @@ const version = (() => {
 		return "dev"
 	}
 })()
-const socketPath = join(tmpdir(), `opencode-notch-${version}.sock`)
+// Overridable so tests can bind a private fake daemon without colliding
+// with a real daemon on the developer's machine.
+const socketPath = process.env.OPENCODE_NOTCH_SOCKET ?? join(tmpdir(), `opencode-notch-${version}.sock`)
 
 type ShowPayload = Record<string, unknown> & { cmd: "show"; id: string }
 type HelperEvent = {
