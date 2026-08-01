@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Cards with non-ASCII session titles (emoji, accents, CJK) no longer arrive
+  garbled or go missing: messages from the helper are now decoded correctly
+  even when a character is split across two pieces of the connection.
+- Bursts of notifications can no longer truncate a message mid-way and jam the
+  connection to the helper; anything the socket cannot take right away is held
+  back and sent, in order, as soon as it drains.
+
 ## 0.6.0 - 2026-07-30
 
 ### Added
