@@ -136,6 +136,12 @@ at the newline-delimited JSON protocol by hand, run the binary in stdio mode:
 
 The full protocol is documented in the header of `swift/notch.swift`.
 
+`bun run demo` walks that protocol for you: it spawns the freshly built helper
+in stdio mode and scripts a live showcase — an idle card, the same card filling
+in with git stats, a second card stacking beside it, and a permission card whose
+buttons you can click — printing every command it sends and every event that
+comes back. It retracts everything and exits on its own after a few seconds.
+
 To release: move the `Unreleased` changelog entries into a new section, bump
 `version` in `package.json`, commit as `chore(release): x.y.z`, tag `vx.y.z`,
 and push with tags. The Release workflow verifies the tag, builds, and

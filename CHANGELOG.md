@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `bun run demo` scripts a live showcase of every card type against the stdio
+  helper — an idle card, a same-id update with git stats, a stacked second
+  card, and a clickable permission card — printing the protocol traffic in both
+  directions. It is a development script and is not published to npm.
+
 ## 0.6.0 - 2026-07-30
 
 ### Added
