@@ -48,6 +48,12 @@ class Helper {
 	private failures = 0
 	private disabledUntil = 0
 	private buffer = ""
+	// Per-connection: a multibyte character can straddle two chunks, so the
+	// decoder has to carry the partial sequence across `data` calls.
+	private decoder = new TextDecoder()
+	private encoder = new TextEncoder()
+	// Tail of a frame the socket refused to take yet; flushed on `drain`.
+	private unsent: Uint8Array | null = null
 
 	constructor(
 		private $: Shell,
@@ -60,12 +66,30 @@ class Helper {
 		const socket = this.socket ?? (await this.connect())
 		if (!socket) return false
 		try {
-			socket.write(JSON.stringify(message) + "\n")
+			this.push(socket, this.encoder.encode(JSON.stringify(message) + "\n"))
 			return true
 		} catch {
 			this.socket = null
 			return false
 		}
+	}
+
+	/**
+	 * A frame goes out whole or not at all: under backpressure write() takes
+	 * only a prefix, and a half-written line desyncs the NDJSON stream for good.
+	 * The remainder waits for `drain`, and later frames queue behind it so the
+	 * daemon still sees them in order.
+	 */
+	private push(socket: Bun.Socket, frame: Uint8Array) {
+		if (this.unsent) {
+			const queued = new Uint8Array(this.unsent.byteLength + frame.byteLength)
+			queued.set(this.unsent)
+			queued.set(frame, this.unsent.byteLength)
+			this.unsent = queued
+			return
+		}
+		const written = socket.write(frame)
+		if (written < frame.byteLength) this.unsent = frame.subarray(written)
 	}
 
 	private async connect(): Promise<Bun.Socket | null> {
@@ -111,6 +135,10 @@ class Helper {
 		this.failures = 0
 		this.disabledUntil = 0
 		this.buffer = ""
+		// Fresh state per connection: a partial character or an unflushed tail
+		// from the dead socket must not bleed into this one.
+		this.decoder = new TextDecoder()
+		this.unsent = null
 		this.onConnected()
 		return socket
 	}
@@ -128,7 +156,7 @@ class Helper {
 			unix: socketPath,
 			socket: {
 				data: (_socket, chunk) => {
-					this.buffer += chunk.toString()
+					this.buffer += this.decoder.decode(chunk, { stream: true })
 					let newline: number
 					while ((newline = this.buffer.indexOf("\n")) >= 0) {
 						const line = this.buffer.slice(0, newline)
@@ -138,6 +166,11 @@ class Helper {
 							this.onEvent(JSON.parse(line) as HelperEvent)
 						} catch {}
 					}
+				},
+				drain: (socket) => {
+					if (!this.unsent) return
+					const written = socket.write(this.unsent)
+					this.unsent = written < this.unsent.byteLength ? this.unsent.subarray(written) : null
 				},
 				close: (socket) => {
 					// The daemon died or dropped us; it also dropped our cards. The
