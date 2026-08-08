@@ -900,7 +900,11 @@ final class NotchController {
 			existing.card.removeFromSuperview()
 			existing.item = item
 			existing.card = card
-			existing.resetTimers()
+			// A fresh `show` for the same id is a new notification and restarts the
+			// dwell. An `update` is late enrichment of a card already on screen, so
+			// it swaps the content but leaves the countdown alone — otherwise a slow
+			// `gh pr view` would silently extend how long the card stays up.
+			if !updateOnly { existing.resetTimers() }
 			if case .entering = existing.phase {} else { existing.phase = .shown }
 			island?.cardContainer.addSubview(card)
 			card.setHovered(hovered)

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, unlinkSync } from "node:fs"
+import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -150,6 +150,55 @@ class Helper {
 	}
 }
 
+/**
+ * Locate the repository's git directory by walking up from `start`, the way
+ * git itself does. `.git` is a directory in a normal clone and a file holding
+ * `gitdir: <path>` in a linked work tree or submodule. Returns null outside a
+ * work tree (or when a `GIT_DIR`-style setup hides it), which is the signal to
+ * fall back to asking git in a subprocess.
+ */
+function findGitDir(start: string): string | null {
+	let dir = start
+	for (;;) {
+		const dot = join(dir, ".git")
+		try {
+			const stat = statSync(dot)
+			if (stat.isDirectory()) return dot
+			if (stat.isFile()) {
+				const pointer = readFileSync(dot, "utf8").trim()
+				if (pointer.startsWith("gitdir:")) {
+					const target = pointer.slice(7).trim()
+					return target.startsWith("/") ? target : join(dir, target)
+				}
+			}
+		} catch {}
+		const parent = dirname(dir)
+		if (parent === dir) return null
+		dir = parent
+	}
+}
+
+/**
+ * The current branch, read straight out of `HEAD`. `git branch --show-current`
+ * is a subprocess spawn plus a repository discovery walk; this is a single
+ * ~40-byte read, so the branch can ride along on the very first frame of the
+ * card instead of arriving as a late update. Detached HEAD yields the short
+ * hash, matching `git rev-parse --short HEAD`.
+ */
+function readBranch(gitDir: string): string {
+	let head: string
+	try {
+		head = readFileSync(join(gitDir, "HEAD"), "utf8").trim()
+	} catch {
+		return ""
+	}
+	if (head.startsWith("ref:")) {
+		const ref = head.slice(4).trim()
+		return ref.startsWith("refs/heads/") ? ref.slice(11) : (ref.split("/").pop() ?? "")
+	}
+	return /^[0-9a-f]{40,}$/.test(head) ? head.slice(0, 7) : ""
+}
+
 export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 	const project = basename(directory) || "opencode"
 
@@ -193,34 +242,38 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 		}
 	}
 
-	// Git context (branch, PR, diff stats) is only gathered inside a work tree;
-	// outside one the card shows just project and title.
-	async function gatherGit(): Promise<{
-		files: number
-		additions: number
-		deletions: number
-		branch: string
-		pr: string
-	} | null> {
-		const isWorkTree =
-			(await $`git rev-parse --is-inside-work-tree`.cwd(directory).quiet().nothrow().text()).trim() ===
-			"true"
-		if (!isWorkTree) return null
+	// The git directory is resolved once per project. Only a hit is cached: a
+	// miss re-walks on the next event, so `git init` mid-session heals itself.
+	let cachedGitDir: string | null = null
+	function gitDir(): string | null {
+		cachedGitDir ??= findGitDir(directory)
+		return cachedGitDir
+	}
+
+	/** Branch without a subprocess, so it can ship with the first frame. */
+	function fastBranch(): string {
+		const dir = gitDir()
+		return dir ? readBranch(dir) : ""
+	}
+
+	/** Branch the slow way, for repos whose layout the file read cannot see. */
+	async function slowBranch(): Promise<string> {
+		const [rawBranch, shortHead] = await Promise.all([
+			$`git branch --show-current`.cwd(directory).quiet().nothrow().text(),
+			// Detached HEAD: fall back to the short commit hash.
+			$`git rev-parse --short HEAD`.cwd(directory).quiet().nothrow().text(),
+		])
+		return rawBranch.trim() || shortHead.trim()
+	}
+
+	// The session summary is reset to zeros and computed asynchronously after
+	// idle, so it is unreliable at notification time. Compute diff stats
+	// directly from git instead.
+	async function diffStats(): Promise<{ files: number; additions: number; deletions: number }> {
+		const numstat = await $`git diff --numstat HEAD`.cwd(directory).quiet().nothrow().text()
 		let files = 0
 		let additions = 0
 		let deletions = 0
-		// The session summary is reset to zeros and computed asynchronously after
-		// idle, so it is unreliable at notification time. Compute diff stats
-		// directly from git instead — and in parallel, since `gh pr view` does a
-		// network round trip.
-		const [numstat, rawBranch, shortHead, rawPr] = await Promise.all([
-			$`git diff --numstat HEAD`.cwd(directory).quiet().nothrow().text(),
-			$`git branch --show-current`.cwd(directory).quiet().nothrow().text(),
-			$`git rev-parse --short HEAD`.cwd(directory).quiet().nothrow().text(),
-			// gh exits non-zero when there is no PR, gh is missing, or the repo has
-			// no GitHub remote; any of those just hides the PR.
-			$`gh pr view --json number --jq .number`.cwd(directory).quiet().nothrow().text(),
-		])
 		for (const line of numstat.trim().split("\n")) {
 			if (!line) continue
 			const cols = line.split("\t")
@@ -231,9 +284,55 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 			if (!isNaN(d)) deletions += d
 			files++
 		}
-		// Detached HEAD: fall back to the short commit hash.
-		const branch = rawBranch.trim() || shortHead.trim()
-		return { files, additions, deletions, branch, pr: rawPr.trim() }
+		return { files, additions, deletions }
+	}
+
+	// gh exits non-zero when there is no PR, gh is missing, or the repo has no
+	// GitHub remote; any of those just hides the PR.
+	async function prNumber(): Promise<string> {
+		const out = await $`gh pr view --json number --jq .number`.cwd(directory).quiet().nothrow().text()
+		return out.trim()
+	}
+
+	async function isWorkTree(): Promise<boolean> {
+		return (
+			(await $`git rev-parse --is-inside-work-tree`.cwd(directory).quiet().nothrow().text()).trim() ===
+			"true"
+		)
+	}
+
+	/** Everything at once — only the one-shot fallback, which cannot update. */
+	async function gatherGit() {
+		if (!gitDir() && !(await isWorkTree())) return null
+		const [branch, stats, pr] = await Promise.all([
+			fastBranch() || slowBranch(),
+			diffStats(),
+			prNumber(),
+		])
+		return { ...stats, branch, pr }
+	}
+
+	/**
+	 * Fill in what the first frame could not carry, each piece landing as soon
+	 * as it is known instead of at the pace of the slowest one — `gh pr view`
+	 * is a network round trip and must not hold up local diff stats.
+	 */
+	async function enrich(show: ShowPayload, branch: string) {
+		if (!gitDir() && !(await isWorkTree())) return
+		// Every update rebuilds the card from the payload, so accumulate rather
+		// than sending each piece on its own.
+		const known: Record<string, unknown> = branch ? { branch } : {}
+		const merge = async (patch: Record<string, unknown>) => {
+			Object.assign(known, patch)
+			await helper.send({ ...show, ...known, cmd: "update" })
+		}
+		// Nothing to say is not worth a frame: an empty diff or a branch with no
+		// PR leaves the card exactly as it was shown.
+		await Promise.all([
+			branch ? undefined : slowBranch().then((b) => (b ? merge({ branch: b }) : undefined)),
+			diffStats().then((stats) => (stats.files > 0 ? merge(stats) : undefined)),
+			prNumber().then((pr) => (pr ? merge({ pr }) : undefined)),
+		])
 	}
 
 	async function fallbackNotify(title: string, body: string) {
@@ -260,6 +359,9 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 		// Per-session id: a second idle for the same session replaces its card in
 		// place instead of stacking a duplicate — this is what replaced the old
 		// global debounce.
+		// Read off HEAD, not out of a subprocess, so the meta line is populated on
+		// the card's very first frame instead of appearing a beat later.
+		const branch = fastBranch()
 		const show: ShowPayload = {
 			cmd: "show",
 			id: `idle:${sessionID}`,
@@ -268,19 +370,17 @@ export const NotchPlugin: Plugin = async ({ client, $, directory }) => {
 			timeout: 60,
 			title: project,
 			subtitle: body,
+			...(branch ? { branch } : {}),
 		}
-		// Show immediately from session data; the git subprocesses (and gh's
-		// network round trip) stay off the critical path and arrive as a same-id
-		// in-place update.
+		// Show immediately from session data plus the branch; diff stats and the
+		// PR lookup stay off the critical path and arrive as same-id in-place
+		// updates.
 		if (!(await helper.send(show))) {
 			await fallbackNotify(project, body)
 			return
 		}
 		try {
-			const git = await gatherGit()
-			// `update` (not `show`): if the card already dwell-expired while gh was
-			// on the network, late stats must not resurrect it.
-			if (git) await helper.send({ ...show, ...git, cmd: "update" })
+			await enrich(show, branch)
 		} catch {}
 	}
 

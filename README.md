@@ -27,9 +27,9 @@ like a native part of the menu bar.
   inventing a response
 - Shows the project and auto-generated session title, so you know which task
   finished
-- Shows the current branch and, when the GitHub CLI finds one, the linked pull
-  request number; the card appears instantly and the git stats pour in a beat
-  later
+- Shows the current branch on the card's first frame — it is read straight out
+  of `.git/HEAD`, not shelled out for — and, when the GitHub CLI finds one, the
+  linked pull request number a beat later
 - Summarizes changed files, additions, and deletions when a response edits code;
   branch, PR, and diff stats only appear inside a git work tree
 - Idle notifications fire only when the main session goes idle: subagent
