@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases use
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- The branch now appears on the card's first frame instead of arriving with the
+  git enrichment: it is read directly from `.git/HEAD` (including linked work
+  trees and detached HEADs), which costs a single file read rather than a
+  subprocess. Diff stats no longer wait behind `gh pr view`'s network round
+  trip either — each piece of git context updates the card as soon as it is
+  known.
+
+### Fixed
+
+- A late enrichment update no longer restarts a card's dwell countdown, so a
+  slow `gh pr view` cannot silently keep a card on screen past its dwell.
+
 ## 0.6.0 - 2026-07-30
 
 ### Added
